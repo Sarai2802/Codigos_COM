@@ -1,0 +1,131 @@
+import numpy as np 
+import matplotlib.pyplot as plt
+from funciones.canalisi import generate_canalisi
+
+# -------------------------------
+# Parámetros de la simulación
+# -------------------------------
+num_symbols = 1000
+sps = 20
+snr_db = 1000
+snr_linear = 10 ** (snr_db / 10)
+fs = 20000
+fc = 2000
+M = 2   # M-ASK ideal
+
+# -------------------------------
+# 1. Generar símbolos M-ASK (ideales)
+# -------------------------------
+d = np.random.randint(0, M, num_symbols)
+
+# Niveles ASK perfectamente reales (PAM)
+levels = np.arange(-(M-1), M, 2)  # Ejemplo: 4-ASK → [-3, -1, 1, 3]
+symbols = levels[d].astype(float)
+
+# Normalización de potencia
+symbols = symbols / np.sqrt(np.mean(symbols**2))
+
+# -------------------------------
+# 2. Generar PULSOS RECTANGULARES IDEALES (NRZ)
+# -------------------------------
+# Aquí está la corrección CLAVE:
+tx_signal = np.repeat(symbols, sps)
+
+# -------------------------------
+# 3. Canal sin ISI (ideal)
+# -------------------------------
+channel = generate_canalisi(length=10, attenuation=0.9)
+tx_signal = np.convolve(tx_signal, channel, mode='same')
+
+plt.figure
+plt.stem(channel, basefmt=" ")
+
+
+# -------------------------------
+# 4. Ruido AWGN
+# -------------------------------
+signal_power = np.mean(tx_signal**2)
+noise_power = signal_power / snr_linear
+noise = np.sqrt(noise_power) * np.random.randn(len(tx_signal))
+
+rx_signal = tx_signal + noise
+
+# -------------------------------
+# 5. Muestreo 
+# -------------------------------
+offset = 10
+sampled_rx = rx_signal[offset::sps]
+
+# -------------------------------
+# 6. Constelación REAL
+# -------------------------------
+plt.figure(figsize=(6,6))
+plt.scatter(sampled_rx, np.zeros_like(sampled_rx),
+            color='blue', s=5, alpha=0.5)
+
+plt.title(f'Constelación  M-ASK (M={M})')
+plt.xlabel('Amplitud (I)')
+plt.ylabel('Q = 0')
+plt.grid(True)
+plt.axis('equal')
+
+# -------------------------------
+# 7. Forma de onda en banda base
+# -------------------------------
+max_symbols = 60
+t_axis = np.arange(max_symbols*sps) / fs
+samples_idx = np.arange(0, max_symbols*sps, sps)
+
+plt.figure(figsize=(12,4))
+plt.plot(t_axis, rx_signal[:max_symbols*sps], label='BB', alpha=0.8)
+plt.plot(t_axis[samples_idx], rx_signal[samples_idx], 'ro', label='Muestras')
+
+plt.title("Señal banda base M-ASK (pulso ideal NRZ)")
+plt.xlabel("Tiempo (s)")
+plt.ylabel("Amplitud")
+plt.grid(True)
+plt.legend()
+plt.tight_layout()
+
+# -------------------------------
+# 8. Diagrama de ojos (real)
+# -------------------------------
+def plot_eye(signal, sps, num=200):
+    plt.figure(figsize=(8,4))
+    for i in range(num):
+        seg = signal[i*sps : i*sps + 2*sps]
+        if len(seg) == 2*sps:
+            plt.plot(seg, color='blue', alpha=0.15)
+    plt.title("Eye Diagram - M-ASK NRZ ideal")
+    plt.grid(True)
+
+plot_eye(rx_signal, sps)
+
+# -------------------------------
+# 9. Pasa Banda
+# -------------------------------
+t = np.arange(len(rx_signal)) / fs
+carrier = np.cos(2*np.pi*fc*t)
+passband_signal = rx_signal * carrier
+
+# Espectro
+N = 4096
+X = np.fft.fftshift(np.fft.fft(passband_signal, N))
+freqs = np.fft.fftshift(np.fft.fftfreq(N, 1/fs))
+
+plt.figure(figsize=(10,5))
+plt.plot(freqs, 20*np.log10(np.abs(X)+1e-12))
+plt.title("Espectro pasa banda M-ASK")
+plt.xlabel("Frecuencia (Hz)")
+plt.ylabel("Magnitud (dB)")
+plt.grid(True)
+
+# Señal PB
+plt.figure(figsize=(12,4))
+plt.plot(t[:max_symbols*sps], passband_signal[:max_symbols*sps])
+plt.title("Señal pasa banda M-ASK")
+plt.xlabel("Tiempo (s)")
+plt.ylabel("Amplitud")
+plt.grid(True)
+
+plt.show()
