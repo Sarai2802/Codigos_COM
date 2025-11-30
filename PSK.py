@@ -28,7 +28,7 @@ def modulate_mpsk(bits, M):
 # ==============================
 # 1. PARÁMETROS DEL SISTEMA
 # ==============================
-M = 16                 # Cambia aquí: 2,4,8,16 para BPSK, QPSK, 8PSK, 16PSK
+M = 2                 # Cambia aquí: 2,4,8,16 para BPSK, QPSK, 8PSK, 16PSK
 Nbits = 200
 sps = 30
 Rb = 1000
